@@ -1,3 +1,5 @@
+/* manual validaton ----> Zod
+
 const transferValidation = (req, res, next) =>{
     const {amount, recieverId} = req.body;
 
@@ -37,6 +39,28 @@ const transferValidation = (req, res, next) =>{
     }
 
     next();
+}
+
+module.exports = transferValidation; */
+
+
+const {transferSchema} = require("../validators/transfer.validator");
+
+const transferValidation = (req, res, next) => {
+    const result = transferSchema.safeParse(req.body);
+
+    if(!result.success){
+        return res.status(400).json({
+            status : "error",
+            message : "Invalid transfer data",
+            errors :  result.error.issues
+        });
+    }
+
+    req.body = result.data;
+
+    next();
+
 }
 
 module.exports = transferValidation;
