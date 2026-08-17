@@ -2,7 +2,7 @@ const {findUserById} = require("../repository/user.repository");
 
 const getUserById = async(userId) =>{
 
-    const user = findUserById(userId);
+    const user = await findUserById(userId);
 
     if(!user){
         return null;
