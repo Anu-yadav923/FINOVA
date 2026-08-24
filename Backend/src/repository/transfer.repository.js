@@ -1,4 +1,4 @@
-const { z } = require("zod/v4/core");
+
 
 const getAccountForUpdate = async(client,accountId) =>{
     const result = await client.query(
@@ -10,11 +10,26 @@ const getAccountForUpdate = async(client,accountId) =>{
     [accountId]
     );
     
-    result.rows[0];
+   return result.rows[0];
 
 
 }
 
+const lockAccountInOrder = async(client, fromAccountId, toAccountId) =>{
+
+    const firstAccountId = Math.min(fromAccountId, toAccountId);
+    const secondAccountId = Math.max(fromAccountId, toAccountId);
+
+    const firstAccount = await getAccountForUpdate(client, firstAccountId);
+    const secondAccount = await getAccountForUpdate(client, secondAccountId);
+
+    return {
+        firstAccount,
+        secondAccount
+    }
+}
+
 module.exports =    {
-    getAccountForUpdate
+   
+    lockAccountInOrder
 };
