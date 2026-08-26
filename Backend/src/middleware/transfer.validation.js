@@ -44,23 +44,21 @@ const transferValidation = (req, res, next) =>{
 module.exports = transferValidation; */
 
 
-const {transferSchema} = require("../validators/transfer.validator");
+const validate = (schema) =>{
+    return (req, res, next) =>{
+        const result = schema.safeParse(req.body);
 
-const transferValidation = (req, res, next) => {
-    const result = transferSchema.safeParse(req.body);
+        if(!result.success){
+            res.status(400).json({
+                status: false,
+                message: "Invalid data",
+                error: result.error.issues
+            });
 
-    if(!result.success){
-        return res.status(400).json({
-            status : "error",
-            message : "Invalid transfer data",
-            errors :  result.error.issues
-        });
+        }
+        req.body = result.data;
+        next();
     }
-
-    req.body = result.data;
-
-    next();
-
 }
 
-module.exports = transferValidation;
+module.exports = validate;

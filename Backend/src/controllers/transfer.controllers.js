@@ -1,13 +1,23 @@
+const { transferMoney} = require("../services/transfer.service");
 
-const { createTransfer} = require("../services/transfer.service");
 
+const createTransfer = async(req, res, next) =>{
+   try{
+     const {fromAccountId, toAccountId, amount} = req.body;
 
-const transferControllers = ((req, res) => {
-    
-    const result = createTransfer(req.body);
-    res.status(200).json(result);
-});
+    const result = await transferMoney(fromAccountId, toAccountId, amount);
+
+    return res.status(201).json({
+        success : true,
+        data:result
+    });
+   }
+   catch(error){
+        next(error);
+   }
+
+}
 
 module.exports = {
-    transferControllers
+    createTransfer
 };
