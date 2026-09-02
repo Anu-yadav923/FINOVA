@@ -1,6 +1,9 @@
 const pool = require("../config/database");
 const AppError = require("../errors/AppError");
 const {lockAccountInOrder} = require("../repository/transfer.repository");
+const accountRepository = require("../repository/account.repository");
+const { createLedgerEntry } = require("../repository/ledger.respository");
+const transactionRepository = require("../repository/transaction.repositoy");
 
 const transferMoney = async(fromAccountId, toAccountId, amount) => {
 
@@ -40,7 +43,7 @@ const transferMoney = async(fromAccountId, toAccountId, amount) => {
             throw new AppError("Insufficient balance", 400);
         }
 
-        await client.query(
+       /* await client.query(
             `
                 UPDATE accounts
                 SET balance_paise = balance_paise - $1
@@ -56,12 +59,16 @@ const transferMoney = async(fromAccountId, toAccountId, amount) => {
                 WHERE id = $2
             `,
             [amountPaise, toAccount.id]
-        );
+        ); */
+
+        await accountRepository.updateBalance(client, fromAccount, -amountPaise);
+        await accountRepository.updateBalance(client, toAccount, amountPaise);
+
 
         const reference = `TXN_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
             
 
-        const transactionResult = await client.query(
+       /* const transactionResult = await client.query(
             `
                 INSERT INTO transactions(
                     reference,
@@ -76,10 +83,13 @@ const transferMoney = async(fromAccountId, toAccountId, amount) => {
 
             [reference, "TRANSFER", amountPaise, "INR", "COMPLETED"]
         );
+         */
 
-        const transactionId = transactionResult.rows[0].id;
+       
+        const transaction = await transactionRepository.createTransaction(client, reference, amountPaise);
+        const transactionId = transaction.rows[0].id;
 
-        await client.query(
+       /* await client.query(
             `
                 INSERT INTO ledger_entries(
                     transaction_id,
@@ -104,7 +114,10 @@ const transferMoney = async(fromAccountId, toAccountId, amount) => {
                 VALUES($1, $2, $3, $4)
             `,
             [transactionId, toAccount.id, "CREDIT", amountPaise]
-        );
+        ); */
+
+        await createLedgerEntry(client, transactionId, fromAccountId, "DEBIT", amountPaise );
+        await createLedgerEntry(client, transactionId, toAccountId, "CREDIT", amountPaise );
 
         await client.query("COMMIT");
 

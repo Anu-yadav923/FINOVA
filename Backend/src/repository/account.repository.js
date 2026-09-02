@@ -10,6 +10,20 @@ const findAccountByUserId = async(userId) => {
 
 };
 
+const updateBalance = async(client,lockAccountInOrder, amountPaise) =>{
+    const query = ` UPDATE accounts 
+                    SET balance_paise = balance_paise + $1;
+                    WHERE id = $2                
+    `;
+    const result = await client.query(
+        query,
+        [lockAccountInOrder, amountPaise]
+    );
+
+    return result.rows[0] || null;
+}
+
 module.exports = {
-    findAccountByUserId
+    findAccountByUserId,
+    updateBalance
 };
