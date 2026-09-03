@@ -4,8 +4,10 @@ const {lockAccountInOrder} = require("../repository/transfer.repository");
 const accountRepository = require("../repository/account.repository");
 const { createLedgerEntry } = require("../repository/ledger.respository");
 const transactionRepository = require("../repository/transaction.repositoy");
+const idempotencyRepository = require("../repository/idempotency.repository");
 
-const transferMoney = async(fromAccountId, toAccountId, amount) => {
+
+const transferMoney = async(fromAccountId, toAccountId, amount, idempotencyKey) => {
 
     if(fromAccountId === toAccountId){
         throw new AppError ("Source & Destination account must be different! ", 400);
@@ -26,6 +28,23 @@ const transferMoney = async(fromAccountId, toAccountId, amount) => {
     try {
 
         await client.query("BEGIN");
+
+        const existingKey = await idempotencyRepository.getKey(client, idempotencyKey);
+
+        if(existingKey){
+            if(existingKey.status === "COMPLETED"){
+                await client.query("COMMIT");
+                return existingKey.response;
+            }
+
+            if(existingKey.status === "PENDING"){
+                throw new AppError("Transfer is already being processed", 409);
+            }
+        }
+
+        if(existingKey === null){
+            await idempotencyRepository.createKey(client, idempotencyKey);
+        }
 
         const {firstAccount, secondAccount} = await lockAccountInOrder(
             client, fromAccountId, toAccountId
@@ -118,6 +137,15 @@ const transferMoney = async(fromAccountId, toAccountId, amount) => {
 
         await createLedgerEntry(client, transactionId, fromAccountId, "DEBIT", amountPaise );
         await createLedgerEntry(client, transactionId, toAccountId, "CREDIT", amountPaise );
+
+        const response = {
+            transactionId,
+            reference,
+            status : "COMPLETED",
+           
+        }
+
+        await idempotencyRepository.markedCompleted(client, idempotencyKey, response);
 
         await client.query("COMMIT");
 
