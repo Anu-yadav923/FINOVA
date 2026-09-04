@@ -5,10 +5,12 @@ const accountRepository = require("../repository/account.repository");
 const { createLedgerEntry } = require("../repository/ledger.respository");
 const transactionRepository = require("../repository/transaction.repositoy");
 const idempotencyRepository = require("../repository/idempotency.repository");
+const {createRequestHash} = require("../utils/request_hash");
 
 
 const transferMoney = async(fromAccountId, toAccountId, amount, idempotencyKey) => {
 
+   
     if(fromAccountId === toAccountId){
         throw new AppError ("Source & Destination account must be different! ", 400);
     }
@@ -23,6 +25,8 @@ const transferMoney = async(fromAccountId, toAccountId, amount, idempotencyKey) 
 
     const amountPaise = Math.round(amount*100);
 
+     const createHash = createRequestHash(fromAccountId, toAccountId, amountPaise);
+
     const client = await pool.connect();
 
     try {
@@ -32,6 +36,12 @@ const transferMoney = async(fromAccountId, toAccountId, amount, idempotencyKey) 
         const existingKey = await idempotencyRepository.getKey(client, idempotencyKey);
 
         if(existingKey){
+
+            if(existingKey.request_hash !== request_hash){
+                throw new AppError("Idempotency was  already used with different request parameter", 409);
+            }
+
+            
             if(existingKey.status === "COMPLETED"){
                 await client.query("COMMIT");
                 return existingKey.response;
@@ -43,7 +53,7 @@ const transferMoney = async(fromAccountId, toAccountId, amount, idempotencyKey) 
         }
 
         if(existingKey === null){
-            await idempotencyRepository.createKey(client, idempotencyKey);
+            await idempotencyRepository.createKey(client, idempotencyKey, createHash);
         }
 
         const {firstAccount, secondAccount} = await lockAccountInOrder(
