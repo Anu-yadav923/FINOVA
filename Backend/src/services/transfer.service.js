@@ -177,6 +177,24 @@ const transferMoney = async(fromAccountId, toAccountId, amount, idempotencyKey) 
 
 }
 
+const getTransaction = async(pool, transactionId) =>{
+  const  client = await pool.connect();
+
+    try{
+        const transaction = await transactionRepository.getTransactionById(client, transactionId);
+
+        if(!transaction){
+            throw new AppError("Transaction not found", 404);
+        }
+
+        return transaction;
+    }
+    finally {
+        client.release();
+    }
+}
+
 module.exports = {
-    transferMoney
+    transferMoney,
+    getTransaction
 };

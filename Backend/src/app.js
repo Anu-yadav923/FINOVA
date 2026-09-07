@@ -14,6 +14,11 @@ app.use("/api", healthRoutes);
 const transferRoutes = require("./routes/transfer.routes");
 app.use("/api/transfer", transferRoutes);
 
+
+const transactionRoute = require("./routes/transaction.routes");
+app.use("/api/transaction", transactionRoute);
+
+
 app.use(errorHandler);
 
 const usersRoutes = require("./routes/users.routes");
