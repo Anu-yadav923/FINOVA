@@ -16,7 +16,7 @@ const createTransaction = async(client, reference, fromAccountId, toAccountId, a
 
     const result = await client.query(
         query,
-        [reference, "TRANSFER",fromAccountId, toAccountId, amountPaise, "INR", "COMPLETED"]
+        [reference, "TRANSFER",fromAccountId, toAccountId, amountPaise, "INR", "SUCCESS"]
     );
 
     return result.rows[0];
@@ -36,7 +36,28 @@ const getTransactionById = async(client, transactionId) =>{
     return result.rows[0] || null;
 }
 
+
+const getTransactionsByAccount = async(client, AccountId, limit, offset ) =>{
+    const query = `
+        SELECT * FROM transactions
+        WHERE from_account_id = $1
+        OR to_account_id = $1
+        ORDER BY created_at DESC
+        LIMIT = $2
+        OFFSET = $3;
+    `;
+
+    const result = await client.query(
+        query,
+        [AccountId, limit, offset]
+    );
+
+    return result.rows;
+
+}
+
 module.exports = {
     createTransaction,
-    getTransactionById
+    getTransactionById,
+    getTransactionsByAccount
 };

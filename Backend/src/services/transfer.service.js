@@ -3,7 +3,7 @@ const AppError = require("../errors/AppError");
 const {lockAccountInOrder} = require("../repository/transfer.repository");
 const accountRepository = require("../repository/account.repository");
 const { createLedgerEntry } = require("../repository/ledger.respository");
-const transactionRepository = require("../repository/transaction.repositoy");
+const transactionRepository = require("../repository/transaction.repository");
 const idempotencyRepository = require("../repository/idempotency.repository");
 const {createRequestHash} = require("../utils/request_hash");
 
@@ -37,7 +37,7 @@ const transferMoney = async(fromAccountId, toAccountId, amount, idempotencyKey) 
 
         if(existingKey){
 
-            if(existingKey.request_hash !== request_hash){
+            if(existingKey.request_hash !== createHash){
                 throw new AppError("Idempotency was  already used with different request parameter", 409);
             }
 
@@ -115,7 +115,7 @@ const transferMoney = async(fromAccountId, toAccountId, amount, idempotencyKey) 
          */
 
        
-        const transaction = await transactionRepository.createTransaction(client, reference, amountPaise);
+        const transaction = await transactionRepository.createTransaction(client, reference, fromAccountId, toAccountId, amountPaise);
         const transactionId = transaction.rows[0].id;
 
        /* await client.query(
@@ -194,7 +194,24 @@ const getTransaction = async(pool, transactionId) =>{
     }
 }
 
+
+const getTransactionsByAccount = async (pool, accountId, page, limit) =>{
+    
+    const offset = (page - 1) * limit;
+    const client = await pool.connect();
+
+    try {
+        const transactions = await transactionRepository.getTransactionsByAccount(client, accountId, limit, offset);
+
+        return transactions;
+    }
+    finally{
+        client.release();
+    }
+}
+
 module.exports = {
     transferMoney,
-    getTransaction
+    getTransaction,
+    getTransactionsByAccount
 };
