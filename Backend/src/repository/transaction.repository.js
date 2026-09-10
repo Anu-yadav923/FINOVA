@@ -37,19 +37,41 @@ const getTransactionById = async(client, transactionId) =>{
 }
 
 
-const getTransactionsByAccount = async(client, AccountId, limit, offset ) =>{
+const getTransactionsByAccount = async(client, AccountId, limit, offset ,filters) =>{
     const query = `
         SELECT * FROM transactions
-        WHERE from_account_id = $1
+        WHERE (from_account_id = $1
         OR to_account_id = $1
-        ORDER BY created_at DESC
-        LIMIT = $2
-        OFFSET = $3;
+        )
+    `;
+
+    const values = [AccountId];
+
+    if(filters.status){
+        values.push(filters.status);
+
+        query += `AND status = $${values.length}`;
+    }
+
+    if(filters.type){
+        values.push(filters.type);
+        query += `AND type = $${values.length}`;
+    }
+
+    values.push(limit);
+    const limitlen = values.length;
+
+    values.push(offset);
+    const offsetLen = values.length;
+
+    query += ` ORDER BY created_at DESC
+                LIMIT $${limitlen}
+                OFFSET $${offsetLen}
     `;
 
     const result = await client.query(
         query,
-        [AccountId, limit, offset]
+        values
     );
 
     return result.rows;

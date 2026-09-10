@@ -6,6 +6,14 @@ const transferSchema = z.object({
     amount : z.number().positive()
 });
 
+
+const filterSchema = z.object({
+    status : z.enum(["SUCCESS", "PENDING", "FAILED"]).optional(),
+    type : z.enum(["TRANSFER", "WITHDRAWAL", "DEPOSIT"]).optional()
+});
+
 module.exports = {
-    transferSchema
+    transferSchema,
+    filterSchema
 };
+

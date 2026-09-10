@@ -61,4 +61,22 @@ const validate = (schema) =>{
     }
 }
 
-module.exports = validate;
+const validateQuery = (schema) => {
+    return (req, res, next) => {
+        const validatedQuery = schema.parse(req.query);
+
+        if(!validatedQuery){
+            res.status(400).json({
+                status: false,
+                message: "Invalid data! Choose correct Status or Type..."
+
+            });
+        }
+
+        req.query = validatedQuery;
+        next();
+    }
+
+}
+
+module.exports = {validate, validateQuery};
