@@ -1,7 +1,7 @@
 
 const createLedgerEntry = async(client, transactionId, accountId, entryType, amountPaise) =>{
 
-    const query = `INSERT INTO ledger_entry(client, transaction_id, account_id, entry_type, amount_paise)
+    const query = `INSERT INTO ledger_entries(transaction_id, account_id, entry_type, amount_paise)
     VALUES($1, $2, $3, $4)
     RETURNING *;
 
