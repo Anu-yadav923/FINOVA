@@ -1,5 +1,7 @@
 const {findUserById, createUserRepository} = require("../repository/user.repository");
 const {hashPassword} = require("../utils/password");
+const appError = require("../errors/AppError");
+const AppError = require("../errors/AppError");
 
 const getUserById = async(userId) =>{
 
@@ -15,9 +17,19 @@ const getUserById = async(userId) =>{
 const createUserService = async(name, email, password) => {
     const hashedPassword = await hashPassword(password);
 
-    const user = await createUserRepository(name, email, hashedPassword);
+    try {
+         const user = await createUserRepository(name, email, hashedPassword);
+         return user;
+    }
+    catch(error){
 
-    return user;
+        if(error.code === "23505" && error.constraint === "users_email_key"){
+             throw new AppError("Email already Registered!", 409);
+        }
+       
+        throw error;
+    }
+    
 }
 
 module.exports = {
