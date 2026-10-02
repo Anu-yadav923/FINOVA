@@ -1,4 +1,6 @@
-const {getUserById, createUserService} = require("../services/user.service");
+const { success } = require("zod");
+const {getUserById, createUserService, loginUser} = require("../services/user.service");
+
 
 const getUser = async(req, res) =>{
     const userId = req.params.id;
@@ -29,7 +31,21 @@ const createUserControllers = async(req, res) => {
     });
 };
 
+const loginUserController = async(req, res) => {
+    const {email, password} = req.body;
+    const user = await loginUser(email, password);
+    return res.status(200).json({
+        success : true,
+        data : {
+            id : user.id,
+            name : user.name,
+            email : user.email
+        }
+    });
+};
+
 module.exports = {
     getUser,
-    createUserControllers
+    createUserControllers,
+    loginUserController
 };
