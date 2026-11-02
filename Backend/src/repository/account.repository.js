@@ -2,7 +2,7 @@ const pool = require("../config/database");
 
 const findAccountByUserId = async(userId) => {
     const result = await pool.query(
-        "SELECT * FROM accounts WHERE id = $1",
+        `SELECT * FROM accounts WHERE user_id = $1`,
         [userId]
     );
 
@@ -32,8 +32,19 @@ const updateBalance = async(client,lockAccountInOrder, amountPaise) =>{
     return result.rows[0] || null;
 }
 
+const createAccountRepository = async(client,userId) => {
+    const query = `
+        INSERT INTO accounts (user_id, balance_paise)
+        VALUES ($1, $2)
+        RETURNING id, user_id, balance_paise, currency, status, created_at, updated_at;
+    `;
+    const result = await client.query(query, [userId, 0]);
+    return result.rows[0];
+};
+
 module.exports = {
     findAccountByUserId,
     updateBalance,
-    findAccountById
+    findAccountById,
+    createAccountRepository
 };
