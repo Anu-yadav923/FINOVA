@@ -1,8 +1,10 @@
 const {createToken} = require("../utils/jwt");
 const {findUserById,findUserByEmail, createUserRepository} = require("../repository/user.repository");
 const {hashPassword, comparePassword} = require("../utils/password");
-const appError = require("../errors/AppError");
+//const appError = require("../errors/AppError");
 const AppError = require("../errors/AppError");
+const pool = require("../config/database");
+const {createAccountRepository} = require("../repository/account.repository");
 
 const getUserById = async(userId) =>{
 
@@ -18,26 +20,54 @@ const getUserById = async(userId) =>{
 const createUserService = async(name, email, password) => {
     const hashedPassword = await hashPassword(password);
 
-    try {
-         const user = await createUserRepository(name, email, hashedPassword);
-         return user;
-    }
-    catch(error){
+    let client;
+    let transactionStarted = false;
 
-        if(error.code === "23505" && error.constraint === "users_email_key"){
-             throw new AppError("Email already Registered!", 409);
+  try{
+    client = await pool.connect();
+
+    await client.query("BEGIN");
+    transactionStarted = true;
+
+    const user = await createUserRepository(client, name, email,hashedPassword);
+
+    const account = await createAccountRepository(client, user.id);
+
+    await client.query("COMMIT");
+    transactionStarted = false;
+
+    return user;
+  }
+  
+  catch (error) {
+    if(client && transactionStarted){
+        try {
+            await client.query("ROLLBACK");
+        } catch (rollbackError){
+            console.error("Transaction rollback failed", rollbackError);
         }
-       
-        throw error;
     }
+
+    if(error.code === "23505" && error.constraint === "users_email_key"){
+        throw new AppError("Email Already Registered", 409);
+    }
+
+    throw error;
     
 }
+    finally {
+        if(client){
+            client.release();
+        }
+    }
+};
+
 
 const loginUser = async (email, password) => {
     const user = await findUserByEmail(email);
 
     if(!user){
-        throw new appError("Invalid email or password", 401);
+        throw new AppError("Invalid email or password", 401);
     }
 
 

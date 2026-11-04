@@ -22,7 +22,9 @@ const findAccountById = async ( client, accountId) => {
 const updateBalance = async(client,lockAccountInOrder, amountPaise) =>{
     const query = ` UPDATE accounts 
                     SET balance_paise = balance_paise + $1
-                    WHERE id = $2;             
+                    updated_at = NOW()
+                    WHERE id = $2
+                    RETURNING *;             
     `;
     const result = await client.query(
         query,
