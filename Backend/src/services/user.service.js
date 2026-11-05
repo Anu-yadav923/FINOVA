@@ -32,7 +32,7 @@ const createUserService = async(name, email, password) => {
     const user = await createUserRepository(client, name, email,hashedPassword);
 
     const account = await createAccountRepository(client, user.id);
-
+    
     await client.query("COMMIT");
     transactionStarted = false;
 
@@ -75,7 +75,7 @@ const loginUser = async (email, password) => {
 
 
     if(!passwordMatches){
-        throw new appError("Invalid email or password", 401);
+        throw new AppError("Invalid email or password", 401);
     }
 
     const token = createToken(user.id);
