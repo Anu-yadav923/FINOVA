@@ -19,6 +19,20 @@ const findAccountById = async ( client, accountId) => {
     return result.rows[0];
 }
 
+const findAccountByIdAndUserId = async (client, accountId, userId) => {
+    const result = await client.query(
+        `
+            SELECT * FROM accounts
+            WHERE id = $1
+            AND user_id = $2
+        `,
+        [accountId, userId ]
+    
+    );
+
+    return result.rows[0] || null;
+}
+
 const updateBalance = async(client,lockAccountInOrder, amountPaise) =>{
     const query = ` UPDATE accounts 
                     SET balance_paise = balance_paise + $1,
@@ -48,5 +62,6 @@ module.exports = {
     findAccountByUserId,
     updateBalance,
     findAccountById,
-    createAccountRepository
+    createAccountRepository,
+    findAccountByIdAndUserId
 };
