@@ -6,7 +6,8 @@ const {createPaymentOrder, updatePaymentOrderGatewayDetails, markPaymentOrderFai
 const {AppError} = require("../utils/appError");
 
 
-const createPaymentOrder = async(userId, accountId, amountPaise) => {
+
+const createPaymentOrderService = async(userId, accountId, amountPaise) => {
     const client = await pool.connect();
 
     try {
@@ -26,9 +27,57 @@ const createPaymentOrder = async(userId, accountId, amountPaise) => {
 
         const orderId = `FIN_${randomUUID()}`;
 
+        const localOrder = await createPaymentOrder(client, {
+            orderId,
+            userId,
+            accountId,
+            amountPaise,
+            gatewayOrderId : null
+        });
+
+        let razorPayOrder ;
+       try {
+          razorPayOrder = await razorpay.orders.create({
+            amount : amountPaise,
+            currency : "INR",
+            receipt : orderId,
+            notes : {
+                fincoreOrderId : orderId,
+                userId : String(userId),
+                accountId : String(accountId)
+            }
+            });
+        }  catch(error) {
+            await markPaymentOrderFailed(client, orderId, error.message || "Razorpay Order Creation Failed");
+            throw new AppError ("Unable to Create Payment with Razorpay", 502);
+        }
+
+    
+
+        const updatedOrder = await updatePaymentOrderGatewayDetails(client, orderId, razorPayOrder.id);
+
+        if(!updatedOrder){
+            throw new AppError("Payment Order Could Not Be Updated", 500);
+        }
+
+        return {
+            orderId : updatedOrder.order_id,
+            gatewayOrderId : updatedOrder.gateway_order_id,
+            amountPaise : updatedOrder.amount_paise,
+            currency : updatedOrder.currency,
+            status : updatedOrder.status,
+            keyId : process.env.RAZORPAY_KEY_ID
+        };
+
     } 
+
+
 
     finally {
         client.release();
     }
+}
+
+module.exports = {
+    createPaymentOrderService
 }
