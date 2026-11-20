@@ -4,7 +4,7 @@ const router = express.Router();
 
 const {
     authenticate
-} = require("../middleware/auth.middleware");
+} = require("../middleware/auth");
 
 const {
     createPaymentOrderSchema
@@ -16,7 +16,7 @@ const {
 
 const {
     createPaymentOrderController
-} = require("../controllers/payment.controller");
+} = require("../controllers/payment.controllers");
 
 
 router.post(

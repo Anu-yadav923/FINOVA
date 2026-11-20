@@ -29,7 +29,7 @@ const findPaymentOrderByGatewayOrderId = async (client, gatewayOrderId) => {
 const updatePaymentOrderGatewayDetails = async(client, orderId, gatewayOrderId) => {
     const result = await client.query(`
             UPDATE payment_orders
-            SET gateway_order_id = $1
+            SET gateway_order_id = $1,
                 updated_at = NOW()
             WHERE order_id = $2
             RETURNING*
@@ -41,8 +41,8 @@ const updatePaymentOrderGatewayDetails = async(client, orderId, gatewayOrderId) 
 const markPaymentOrderFailed = async(client, orderId, failureReason) => {
     const result = await client.query(`
             UPDATE payment_orders
-            SET status = $1
-                failure_reason = $2
+            SET status = $1,
+                failure_reason = $2,
                 updated_at = NOW()
             WHERE order_id = $3
             RETURNING*
