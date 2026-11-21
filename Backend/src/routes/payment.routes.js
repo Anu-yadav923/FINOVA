@@ -7,7 +7,8 @@ const {
 } = require("../middleware/auth");
 
 const {
-    createPaymentOrderSchema
+    createPaymentOrderSchema,
+    verifyPaymentSchema
 } = require("../validators/payment.validator");
 
 const {
@@ -15,7 +16,8 @@ const {
 } = require("../middleware/transfer.validation");
 
 const {
-    createPaymentOrderController
+    createPaymentOrderController,
+    verifyPaymentController
 } = require("../controllers/payment.controllers");
 
 
@@ -26,5 +28,12 @@ router.post(
     createPaymentOrderController
 );
 
+
+router.post(
+    "/verify",
+    authenticate,
+    validate(verifyPaymentSchema),
+    verifyPaymentController
+);
 
 module.exports = router;
