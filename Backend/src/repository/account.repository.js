@@ -33,7 +33,7 @@ const findAccountByIdAndUserId = async (client, accountId, userId) => {
     return result.rows[0] || null;
 }
 
-const updateBalance = async(client,lockAccountInOrder, amountPaise) =>{
+const updateBalance = async(client,accountId, amountPaise) =>{
     const query = ` UPDATE accounts 
                     SET balance_paise = balance_paise + $1,
                     updated_at = NOW()
@@ -42,7 +42,7 @@ const updateBalance = async(client,lockAccountInOrder, amountPaise) =>{
     `;
     const result = await client.query(
         query,
-        [lockAccountInOrder, amountPaise]
+        [amountPaise, accountId]
     );
 
     return result.rows[0] || null;

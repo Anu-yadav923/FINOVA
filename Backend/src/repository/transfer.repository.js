@@ -30,6 +30,6 @@ const lockAccountInOrder = async(client, fromAccountId, toAccountId) =>{
 }
 
 module.exports =    {
-   
+   getAccountForUpdate,
     lockAccountInOrder
 };

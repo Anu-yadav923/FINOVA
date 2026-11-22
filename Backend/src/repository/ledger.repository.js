@@ -16,7 +16,7 @@ const createLedgerEntry = async(client, transactionId, accountId, entryType, amo
 }
 
 const getLedgerEntryByTransaction = async(client, transactionId) =>{
-    const query = `SELECT * FROM ladger_entries
+    const query = `SELECT * FROM ledger_entries
         WHERE transaction_id = $1
         ORDER BY id ASC
     `;
