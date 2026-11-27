@@ -22,7 +22,8 @@ const {
     findPaymentAttemptByGatewayPaymentId,
     updatePaymentAttempt,
     markPaymentOrderSuccess,
-    findPaymentOrderForUpdate
+    findPaymentOrderForUpdate ,
+    findCapturedAttemptByPaymentOrderId
 } = require("../repository/payment.repository");
 
 const {AppError} = require("../errors/AppError");
@@ -220,9 +221,10 @@ const verifyPayment = async (
 
   // Step 6: Start an atomic database transaction
 const dbClient = await pool.connect();
-
+    let transactionStarted = false;
 try {
     await dbClient.query("BEGIN");
+    transactionStarted = true;
 
     // Lock the payment order to prevent duplicate processing
     const lockedPaymentOrder = await findPaymentOrderForUpdate(
@@ -235,18 +237,43 @@ try {
         throw new AppError("Payment order not found", 404);
     }
 
+    // Revalidate payment details using the locked database record
+if (
+    lockedPaymentOrder.gateway_order_id !== razorpay_order_id ||
+    Number(lockedPaymentOrder.amount_paise) !== razorpayPayment.amount ||
+    lockedPaymentOrder.currency !== razorpayPayment.currency
+) {
+    throw new AppError(
+        "Locked payment order details do not match Razorpay payment",
+        400
+    );
+}
+
     // If already successful, never credit the wallet again
     if (lockedPaymentOrder.status === "SUCCESS") {
-        await dbClient.query("COMMIT");
 
-        return {
-            message: "Payment was already processed",
-            orderId: lockedPaymentOrder.order_id,
-            paymentId: lockedPaymentOrder.gateway_payment_id,
-            status: "SUCCESS",
-            alreadyProcessed: true
-        };
+    // Same payment ID means this is a safe retry
+    if (
+        lockedPaymentOrder.gateway_payment_id !==
+        razorpay_payment_id
+    ) {
+        throw new AppError(
+            "A different payment is already recorded for this order. Manual reconciliation required.",
+            409
+        );
     }
+
+    await dbClient.query("COMMIT");
+     transactionStarted = false;
+
+    return {
+        message: "Payment was already processed",
+        orderId: lockedPaymentOrder.order_id,
+        paymentId: lockedPaymentOrder.gateway_payment_id,
+        status: "SUCCESS",
+        alreadyProcessed: true
+    };
+}
 
     if (lockedPaymentOrder.status !== "PENDING") {
         throw new AppError("Payment order cannot be processed", 409);
@@ -261,6 +288,22 @@ try {
     if (!account) {
         throw new AppError("Wallet account not found", 404);
     }
+
+    if (
+    String(account.user_id) !== String(lockedPaymentOrder.user_id)
+) {
+    throw new AppError(
+        "Payment order does not belong to this wallet account",
+        403
+    );
+}
+
+    if (account.status !== "ACTIVE") {
+    throw new AppError(
+        "Cannot credit an inactive wallet account",
+        400
+    );
+}
 
     // Check whether this Razorpay payment attempt already exists
     const existingAttempt = await findPaymentAttemptByGatewayPaymentId(
@@ -283,7 +326,7 @@ try {
     );
 }
 
-await updatePaymentAttempt(
+const updatedAttempt = await updatePaymentAttempt(
     dbClient,
     razorpay_payment_id,
     {
@@ -292,15 +335,43 @@ await updatePaymentAttempt(
         failureReason: null
     }
 );
-    } else {
-        await createPaymentAttempt(dbClient, {
-            paymentOrderId: lockedPaymentOrder.id,
-            gatewayPaymentId: razorpay_payment_id,
-            amountPaise: lockedPaymentOrder.amount_paise,
-            status: "CAPTURED",
-            method: razorpayPayment.method
-        });
+
+if (!updatedAttempt) {
+    throw new AppError(
+        "Unable to update payment attempt",
+        500
+    );
+}
+    } 
+ else {
+
+    const capturedAttempt = await findCapturedAttemptByPaymentOrderId(
+        dbClient,
+        lockedPaymentOrder.id
+    );
+
+    if (capturedAttempt) {
+        throw new AppError(
+            "Another payment attempt is already captured for this order. Manual reconciliation required.",
+            409
+        );
     }
+
+    const createdAttempt = await createPaymentAttempt(dbClient, {
+        paymentOrderId: lockedPaymentOrder.id,
+        gatewayPaymentId: razorpay_payment_id,
+        amountPaise: lockedPaymentOrder.amount_paise,
+        status: "CAPTURED",
+        method: razorpayPayment.method
+    });
+
+    if (!createdAttempt) {
+        throw new AppError(
+            "Unable to create payment attempt",
+            500
+        );
+    }
+}
 
     // Credit the wallet
     const updatedAccount = await updateBalance(
@@ -313,6 +384,16 @@ await updatePaymentAttempt(
         throw new AppError("Unable to credit wallet", 500);
     }
 
+    if (
+    String(updatedAccount.id) !==
+    String(lockedPaymentOrder.account_id)
+) {
+    throw new AppError(
+        "Updated wallet account does not match payment order",
+        500
+    );
+}
+
     // Create a deposit transaction
     const transaction = await createDepositTransaction(
         dbClient,
@@ -321,14 +402,28 @@ await updatePaymentAttempt(
         lockedPaymentOrder.amount_paise
     );
 
-    // Create the corresponding CREDIT ledger entry
-    await createLedgerEntry(
-        dbClient,
-        transaction.id,
-        lockedPaymentOrder.account_id,
-        "CREDIT",
-        lockedPaymentOrder.amount_paise
+    if (!transaction) {
+    throw new AppError(
+        "Unable to create deposit transaction",
+        500
     );
+}
+
+    // Create the corresponding CREDIT ledger entry
+    const ledgerEntry = await createLedgerEntry(
+    dbClient,
+    transaction.id,
+    lockedPaymentOrder.account_id,
+    "CREDIT",
+    lockedPaymentOrder.amount_paise
+);
+
+if (!ledgerEntry) {
+    throw new AppError(
+        "Unable to create ledger entry",
+        500
+    );
+}
 
     // Mark the payment order as successful
   const successfulPaymentOrder = await markPaymentOrderSuccess(
@@ -345,7 +440,7 @@ if (!successfulPaymentOrder) {
 }
     // Save all changes together
     await dbClient.query("COMMIT");
-
+     transactionStarted = false;
     return {
         message: "Payment verified and wallet credited successfully",
         orderId: lockedPaymentOrder.order_id,
@@ -355,16 +450,24 @@ if (!successfulPaymentOrder) {
         alreadyProcessed: false
     };
 
-} catch (error) {
-    await dbClient.query("ROLLBACK");
+}  catch (error) {
+
+    if (transactionStarted) {
+        try {
+            await dbClient.query("ROLLBACK");
+        } catch (rollbackError) {
+            // Preserve the original error.
+        }
+    }
+
     throw error;
 
 } finally {
     dbClient.release();
-}
+
 };
 
-
+}
 module.exports = {
     createPaymentOrderService,
     verifyPayment
